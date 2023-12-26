@@ -77,11 +77,60 @@ func FromClaimModelToW3CCredential(claim domain.Claim) (*verifiable.W3CCredentia
 	return &cred, nil
 }
 
+// FromClaimModelToW3CCredential JSON-LD response base on claim
+func FromClaimPublicInfoModelToW3CCredential(claim domain.ClaimPublicInfo) (*verifiable.W3CCredential, error) {
+	var cred verifiable.W3CCredential
+
+	if claim.CredentialStatus.Status == pgtype.Null {
+		return nil, fmt.Errorf("credential status is not set")
+	}
+
+	proofs := make(verifiable.CredentialProofs, 0)
+
+	var signatureProof *verifiable.BJJSignatureProof2021
+	if claim.SignatureProof.Status != pgtype.Null {
+		err := claim.SignatureProof.AssignTo(&signatureProof)
+		if err != nil {
+			return nil, err
+		}
+		proofs = append(proofs, signatureProof)
+	}
+
+	var mtpProof *verifiable.Iden3SparseMerkleTreeProof
+
+	if claim.MTPProof.Status != pgtype.Null {
+		err := claim.MTPProof.AssignTo(&mtpProof)
+		if err != nil {
+			return nil, err
+		}
+		proofs = append(proofs, mtpProof)
+
+	}
+	cred.Proof = proofs
+
+	return &cred, nil
+}
+
 // FromClaimsModelToW3CCredential JSON-LD response base on claim
 func FromClaimsModelToW3CCredential(credentials domain.Credentials) ([]*verifiable.W3CCredential, error) {
 	w3Credentials := make([]*verifiable.W3CCredential, len(credentials))
 	for i := range credentials {
 		w3Cred, err := FromClaimModelToW3CCredential(*credentials[i])
+		if err != nil {
+			return nil, err
+		}
+
+		w3Credentials[i] = w3Cred
+	}
+
+	return w3Credentials, nil
+}
+
+// FromClaimsModelToW3CCredential JSON-LD response base on claim
+func FromClaimsPublicInfoModelToW3CCredential(credentials []*domain.ClaimPublicInfo) ([]*verifiable.W3CCredential, error) {
+	w3Credentials := make([]*verifiable.W3CCredential, len(credentials))
+	for i := range credentials {
+		w3Cred, err := FromClaimPublicInfoModelToW3CCredential(*credentials[i])
 		if err != nil {
 			return nil, err
 		}

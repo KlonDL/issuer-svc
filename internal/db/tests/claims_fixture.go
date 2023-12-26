@@ -37,7 +37,7 @@ func (f *Fixture) CreateSchema(t *testing.T, ctx context.Context, s *domain.Sche
 }
 
 // GetDefaultAuthClaimOfIssuer returns the default auth claim of an issuer just created
-func (f *Fixture) GetDefaultAuthClaimOfIssuer(t *testing.T, issuerID string) *domain.Claim {
+func (f *Fixture) GetDefaultAuthClaimOfIssuer(t *testing.T, issuerID string) *domain.ClaimPublicInfo {
 	t.Helper()
 	ctx := context.Background()
 	did, err := w3c.ParseDID(issuerID)
@@ -60,18 +60,21 @@ func (f *Fixture) NewClaim(t *testing.T, identity string) *domain.Claim {
 	nonce := int64(123)
 	revNonce := domain.RevNonceUint64(nonce)
 	claim := &domain.Claim{
-		ID:              claimID,
-		Identifier:      &identity,
-		Issuer:          identity,
-		SchemaHash:      "ca938857241db9451ea329256b9c06e5",
+		ClaimPublicInfo: domain.ClaimPublicInfo{
+			ID:         claimID,
+			Identifier: &identity,
+			Issuer:     identity,
+			SchemaHash: "ca938857241db9451ea329256b9c06e5",
+			Expiration: 0,
+			RevNonce:   revNonce,
+			CoreClaim:  domain.CoreClaim{},
+			Status:     nil,
+		},
+
 		SchemaURL:       "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json-ld/auth.json-ld",
 		SchemaType:      "AuthBJJCredential",
 		OtherIdentifier: "did:polygonid:polygon:mumbai:2qE1BZ7gcmEoP2KppvFPCZqyzyb5tK9T6Gec5HFANQ",
-		Expiration:      0,
 		Version:         0,
-		RevNonce:        revNonce,
-		CoreClaim:       domain.CoreClaim{},
-		Status:          nil,
 	}
 
 	vc := verifiable.W3CCredential{

@@ -11,7 +11,6 @@ import (
 	"github.com/iden3/go-schema-processor/v2/verifiable"
 	comm "github.com/iden3/iden3comm/v2"
 	"github.com/iden3/iden3comm/v2/protocol"
-
 	"github.com/polygonid/sh-id-platform/internal/common"
 	"github.com/polygonid/sh-id-platform/internal/core/domain"
 )
@@ -58,6 +57,7 @@ type ClaimsFilter struct {
 	FTSQuery        string
 	FTSAndCond      bool
 	Proofs          []verifiable.ProofType
+	Auth            bool
 }
 
 // NewClaimsFilter returns a valid claims filter
@@ -182,15 +182,16 @@ type ClaimsService interface {
 	Save(ctx context.Context, claimReq *CreateClaimRequest) (*domain.Claim, error)
 	CreateCredential(ctx context.Context, req *CreateClaimRequest) (*domain.Claim, error)
 	Revoke(ctx context.Context, id w3c.DID, nonce uint64, description string) error
-	GetAll(ctx context.Context, did w3c.DID, filter *ClaimsFilter) ([]*domain.Claim, error)
+	GetAll(ctx context.Context, did w3c.DID, filter *ClaimsFilter) ([]*domain.ClaimPublicInfo, error)
 	RevokeAllFromConnection(ctx context.Context, connID uuid.UUID, issuerID w3c.DID) error
 	GetRevocationStatus(ctx context.Context, issuerDID w3c.DID, nonce uint64) (*verifiable.RevocationStatus, error)
-	GetByID(ctx context.Context, issID *w3c.DID, id uuid.UUID) (*domain.Claim, error)
+	GetByID(ctx context.Context, issID *w3c.DID, id uuid.UUID) (*domain.ClaimPublicInfo, error)
+	GetByIDAuth(ctx context.Context, issID *w3c.DID, id uuid.UUID) (*domain.Claim, error)
 	GetCredentialQrCode(ctx context.Context, issID *w3c.DID, id uuid.UUID, hostURL string) (string, string, error)
 	Agent(ctx context.Context, req *AgentRequest) (*domain.Agent, error)
-	GetAuthClaim(ctx context.Context, did *w3c.DID) (*domain.Claim, error)
-	GetAuthClaimForPublishing(ctx context.Context, did *w3c.DID, state string) (*domain.Claim, error)
+	GetAuthClaim(ctx context.Context, did *w3c.DID) (*domain.ClaimPublicInfo, error)
+	GetAuthClaimForPublishing(ctx context.Context, did *w3c.DID, state string) (*domain.ClaimPublicInfo, error)
 	UpdateClaimsMTPAndState(ctx context.Context, currentState *domain.IdentityState) error
 	Delete(ctx context.Context, id uuid.UUID) error
-	GetByStateIDWithMTPProof(ctx context.Context, did *w3c.DID, state string) ([]*domain.Claim, error)
+	GetByStateIDWithMTPProof(ctx context.Context, did *w3c.DID, state string) ([]*domain.ClaimPublicInfo, error)
 }

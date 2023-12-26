@@ -121,7 +121,7 @@ func (imts *IdentityMerkleTrees) GenerateRevocationProof(ctx context.Context, no
 }
 
 // AddClaim adds a Claim into the MerkleTree
-func (imts *IdentityMerkleTrees) AddClaim(ctx context.Context, c *Claim) error {
+func (imts *IdentityMerkleTrees) AddClaim(ctx context.Context, c *ClaimPublicInfo) error {
 	if len(imts.Trees) < mtTypesCount {
 		return errorMsgNotCreated
 	}

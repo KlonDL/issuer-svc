@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	uuid "github.com/google/uuid"
@@ -38,6 +39,9 @@ type AgentResponse struct {
 	Type     string      `json:"type"`
 }
 
+// ByteArray defines model for ByteArray.
+type ByteArray = []byte
+
 // Config defines model for Config.
 type Config = []KeyValue
 
@@ -56,6 +60,16 @@ type CreateClaimRequest struct {
 // CreateClaimResponse defines model for CreateClaimResponse.
 type CreateClaimResponse struct {
 	Id string `json:"id"`
+}
+
+// CreateCredentialRequest defines model for CreateCredentialRequest.
+type CreateCredentialRequest struct {
+	CredentialSchema  string                 `json:"credentialSchema"`
+	CredentialSubject map[string]interface{} `json:"credentialSubject"`
+	Expiration        *time.Time             `json:"expiration,omitempty"`
+	MtProof           *bool                  `json:"mtProof,omitempty"`
+	SignatureProof    *bool                  `json:"signatureProof,omitempty"`
+	Type              string                 `json:"type"`
 }
 
 // CreateIdentityRequest defines model for CreateIdentityRequest.
@@ -78,10 +92,24 @@ type CreateIdentityResponse struct {
 	State      *IdentityState `json:"state,omitempty"`
 }
 
-// CredentialSchema defines model for CredentialSchema.
-type CredentialSchema struct {
-	Id   string `json:"id"`
-	Type string `json:"type"`
+// Credential defines model for Credential.
+type Credential struct {
+	CreatedAt             TimeUTC                `json:"createdAt"`
+	CredentialSubject     map[string]interface{} `json:"credentialSubject"`
+	Data                  ByteArray              `json:"data"`
+	Expired               bool                   `json:"expired"`
+	ExpiresAt             *TimeUTC               `json:"expiresAt"`
+	Id                    uuid.UUID              `json:"id"`
+	ProofTypes            []string               `json:"proofTypes"`
+	RevNonce              uint64                 `json:"revNonce"`
+	Revoked               bool                   `json:"revoked"`
+	SchemaHash            string                 `json:"schemaHash"`
+	SchemaType            string                 `json:"schemaType"`
+	SchemaTypeDescription *string                `json:"schemaTypeDescription,omitempty"`
+	SchemaUrl             string                 `json:"schemaUrl"`
+	Updatable             bool                   `json:"updatable"`
+	UserID                string                 `json:"userID"`
+	Version               uint32                 `json:"version"`
 }
 
 // GenericErrorMessage defines model for GenericErrorMessage.
@@ -108,16 +136,12 @@ type GetClaimQrCodeResponse struct {
 
 // GetClaimResponse defines model for GetClaimResponse.
 type GetClaimResponse struct {
-	Context           []string               `json:"@context"`
-	CredentialSchema  CredentialSchema       `json:"credentialSchema"`
-	CredentialStatus  interface{}            `json:"credentialStatus"`
-	CredentialSubject map[string]interface{} `json:"credentialSubject"`
-	Expiration        *TimeUTC               `json:"expiration"`
-	Id                string                 `json:"id"`
-	IssuanceDate      *TimeUTC               `json:"issuanceDate"`
-	Issuer            string                 `json:"issuer"`
-	Proof             interface{}            `json:"proof"`
-	Type              []string               `json:"type"`
+	CredentialStatus interface{} `json:"credentialStatus"`
+	Expiration       *TimeUTC    `json:"expiration"`
+	Id               string      `json:"id"`
+	Issuer           string      `json:"issuer"`
+	Proof            interface{} `json:"proof"`
+	Type             []string    `json:"type"`
 }
 
 // GetClaimsResponse defines model for GetClaimsResponse.
@@ -264,6 +288,9 @@ type CreateIdentityJSONRequestBody = CreateIdentityRequest
 // CreateClaimJSONRequestBody defines body for CreateClaim for application/json ContentType.
 type CreateClaimJSONRequestBody = CreateClaimRequest
 
+// CreateCredentialJSONRequestBody defines body for CreateCredential for application/json ContentType.
+type CreateCredentialJSONRequestBody = CreateCredentialRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Get the documentation
@@ -314,6 +341,9 @@ type ServerInterface interface {
 	// Get Claim QR code
 	// (GET /v1/{identifier}/claims/{id}/qrcode)
 	GetClaimQrCode(w http.ResponseWriter, r *http.Request, identifier PathIdentifier, id PathClaim)
+	// Create Credential
+	// (POST /v1/{identifier}/credentials)
+	CreateCredential(w http.ResponseWriter, r *http.Request, identifier PathIdentifier)
 	// Publish Identity State
 	// (POST /v1/{identifier}/state/publish)
 	PublishIdentityState(w http.ResponseWriter, r *http.Request, identifier PathIdentifier)
@@ -419,6 +449,12 @@ func (_ Unimplemented) GetClaim(w http.ResponseWriter, r *http.Request, identifi
 // Get Claim QR code
 // (GET /v1/{identifier}/claims/{id}/qrcode)
 func (_ Unimplemented) GetClaimQrCode(w http.ResponseWriter, r *http.Request, identifier PathIdentifier, id PathClaim) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create Credential
+// (POST /v1/{identifier}/credentials)
+func (_ Unimplemented) CreateCredential(w http.ResponseWriter, r *http.Request, identifier PathIdentifier) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -886,6 +922,34 @@ func (siw *ServerInterfaceWrapper) GetClaimQrCode(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// CreateCredential operation middleware
+func (siw *ServerInterfaceWrapper) CreateCredential(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "identifier" -------------
+	var identifier PathIdentifier
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "identifier", runtime.ParamLocationPath, chi.URLParam(r, "identifier"), &identifier)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "identifier", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCredential(w, r, identifier)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // PublishIdentityState operation middleware
 func (siw *ServerInterfaceWrapper) PublishIdentityState(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -1102,6 +1166,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/{identifier}/claims/{id}/qrcode", wrapper.GetClaimQrCode)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/{identifier}/credentials", wrapper.CreateCredential)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/{identifier}/state/publish", wrapper.PublishIdentityState)
@@ -1713,6 +1780,60 @@ func (response GetClaimQrCode500JSONResponse) VisitGetClaimQrCodeResponse(w http
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateCredentialRequestObject struct {
+	Identifier PathIdentifier `json:"identifier"`
+	Body       *CreateCredentialJSONRequestBody
+}
+
+type CreateCredentialResponseObject interface {
+	VisitCreateCredentialResponse(w http.ResponseWriter) error
+}
+
+type CreateCredential200JSONResponse Credential
+
+func (response CreateCredential200JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateCredential400JSONResponse struct{ N400JSONResponse }
+
+func (response CreateCredential400JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateCredential401JSONResponse struct{ N401JSONResponse }
+
+func (response CreateCredential401JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateCredential422JSONResponse struct{ N422JSONResponse }
+
+func (response CreateCredential422JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateCredential500JSONResponse struct{ N500JSONResponse }
+
+func (response CreateCredential500JSONResponse) VisitCreateCredentialResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type PublishIdentityStateRequestObject struct {
 	Identifier PathIdentifier `json:"identifier"`
 }
@@ -1851,6 +1972,9 @@ type StrictServerInterface interface {
 	// Get Claim QR code
 	// (GET /v1/{identifier}/claims/{id}/qrcode)
 	GetClaimQrCode(ctx context.Context, request GetClaimQrCodeRequestObject) (GetClaimQrCodeResponseObject, error)
+	// Create Credential
+	// (POST /v1/{identifier}/credentials)
+	CreateCredential(ctx context.Context, request CreateCredentialRequestObject) (CreateCredentialResponseObject, error)
 	// Publish Identity State
 	// (POST /v1/{identifier}/state/publish)
 	PublishIdentityState(ctx context.Context, request PublishIdentityStateRequestObject) (PublishIdentityStateResponseObject, error)
@@ -2308,6 +2432,39 @@ func (sh *strictHandler) GetClaimQrCode(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetClaimQrCodeResponseObject); ok {
 		if err := validResponse.VisitGetClaimQrCodeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateCredential operation middleware
+func (sh *strictHandler) CreateCredential(w http.ResponseWriter, r *http.Request, identifier PathIdentifier) {
+	var request CreateCredentialRequestObject
+
+	request.Identifier = identifier
+
+	var body CreateCredentialJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateCredential(ctx, request.(CreateCredentialRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateCredential")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateCredentialResponseObject); ok {
+		if err := validResponse.VisitCreateCredentialResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

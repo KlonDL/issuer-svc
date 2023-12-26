@@ -23,31 +23,16 @@ type CoreClaim core.Claim
 
 // Claim struct
 type Claim struct {
-	ID               uuid.UUID       `json:"-"`
-	Identifier       *string         `json:"identifier"`
-	Issuer           string          `json:"issuer"`
-	SchemaHash       string          `json:"schema_hash"`
-	SchemaURL        string          `json:"schema_url"`
-	SchemaType       string          `json:"schema_type"`
-	OtherIdentifier  string          `json:"other_identifier"`
-	Expiration       int64           `json:"expiration"`
-	Updatable        bool            `json:"updatable"`
-	Version          uint32          `json:"version"`
-	RevNonce         RevNonceUint64  `json:"rev_nonce"`
-	Revoked          bool            `json:"revoked"`
-	Data             pgtype.JSONB    `json:"data"`
-	CoreClaim        CoreClaim       `json:"core_claim"`
-	MTPProof         pgtype.JSONB    `json:"mtp_proof"`
-	SignatureProof   pgtype.JSONB    `json:"signature_proof"`
-	IdentityState    *string         `json:"-"`
-	Status           *IdentityStatus `json:"status"`
-	CredentialStatus pgtype.JSONB    `json:"credential_status"`
-	HIndex           string          `json:"-"`
-
-	MtProof               bool       `json:"mt_poof"`
-	LinkID                *uuid.UUID `json:"-"`
-	CreatedAt             time.Time  `json:"-"`
-	SchemaTypeDescription *string    `json:"schema_type_description"`
+	SchemaURL             string       `json:"schema_url"`
+	SchemaType            string       `json:"schema_type"`
+	OtherIdentifier       string       `json:"other_identifier"`
+	Updatable             bool         `json:"updatable"`
+	Version               uint32       `json:"version"`
+	Data                  pgtype.JSONB `json:"data"`
+	LinkID                *uuid.UUID   `json:"-"`
+	CreatedAt             time.Time    `json:"-"`
+	SchemaTypeDescription *string      `json:"schema_type_description"`
+	ClaimPublicInfo
 }
 
 // Credentials is the type of array of credential
@@ -83,16 +68,18 @@ func FromClaimer(claim *core.Claim, schemaURL, schemaType string) (*Claim, error
 	sb := claim.GetSchemaHash()
 	schemaHash := hex.EncodeToString(sb[:])
 	res := Claim{
-		SchemaHash:      schemaHash,
+		ClaimPublicInfo: ClaimPublicInfo{
+			SchemaHash: schemaHash,
+			Expiration: expiration,
+			RevNonce:   RevNonceUint64(claim.GetRevocationNonce()),
+			CoreClaim:  CoreClaim(*claim),
+			HIndex:     hindex.String(),
+		},
 		SchemaURL:       schemaURL,
 		SchemaType:      schemaType,
 		OtherIdentifier: otherIdentifier,
-		Expiration:      expiration,
 		Updatable:       claim.GetFlagUpdatable(),
 		Version:         claim.GetVersion(),
-		RevNonce:        RevNonceUint64(claim.GetRevocationNonce()),
-		CoreClaim:       CoreClaim(*claim),
-		HIndex:          hindex.String(),
 	}
 
 	return &res, nil
@@ -133,6 +120,46 @@ func BuildTreeState(state, claimsTreeRoot, revocationTreeRoot, rootOfRoots *stri
 		RevocationRoot: common.StrMTHex(revocationTreeRoot),
 		RootOfRoots:    common.StrMTHex(rootOfRoots),
 	}, nil
+}
+
+//func (c *Claim) GetID() uuid.UUID {
+//	return c.ID
+//}
+//
+//func (c *Claim) GetIdentifier() *string {
+//	return c.Identifier
+//}
+//
+//func (c *Claim) GetIssuer() string {
+//	return c.Issuer
+//}
+//
+//func (c *Claim) GetRevNonce() RevNonceUint64 {
+//	return c.RevNonce
+//}
+//
+//func (c *Claim) GetRevoked() bool {
+//	return c.Revoked
+//}
+//
+//func (c *Claim) SetRevoked(revoked bool) {
+//	c.Revoked = revoked
+//}
+//
+//func (c *Claim) GetCoreClaim() CoreClaim {
+//	return c.CoreClaim
+//}
+//
+//func (c *Claim) GetSignatureProof() pgtype.JSONB {
+//	return c.SignatureProof
+//}
+//
+//func (c *Claim) GetCredentialStatusRaw() pgtype.JSONB {
+//	return c.CredentialStatus
+//}
+
+func (c *Claim) ConvertToClaimPublicInfo() *ClaimPublicInfo {
+	return &c.ClaimPublicInfo
 }
 
 // GetBJJSignatureProof2021 TBD
@@ -184,14 +211,16 @@ func NewClaimModel(jsonSchemaURL string, credentialType string, coreClaim core.C
 	schemaHash := coreClaim.GetSchemaHash()
 
 	claimModel := Claim{
-		SchemaHash: hex.EncodeToString(schemaHash[:]),
+		ClaimPublicInfo: ClaimPublicInfo{
+			SchemaHash: hex.EncodeToString(schemaHash[:]),
+			RevNonce:   RevNonceUint64(coreClaim.GetRevocationNonce()),
+			CoreClaim:  CoreClaim(coreClaim),
+			HIndex:     hindex.String(),
+		},
 		SchemaURL:  jsonSchemaURL,
 		SchemaType: credentialType,
 		Updatable:  coreClaim.GetFlagUpdatable(),
 		Version:    coreClaim.GetVersion(),
-		RevNonce:   RevNonceUint64(coreClaim.GetRevocationNonce()),
-		CoreClaim:  CoreClaim(coreClaim),
-		HIndex:     hindex.String(),
 	}
 
 	if did != nil {
@@ -232,4 +261,105 @@ func (c *Claim) GetCredentialStatus() (*verifiable.CredentialStatus, error) {
 		return nil, err
 	}
 	return cStatus, nil
+}
+
+type ClaimPublicInfoI interface {
+	GetID() uuid.UUID
+	GetIdentifier() *string
+	GetIssuer() string
+	GetRevNonce() RevNonceUint64
+	GetRevoked() bool
+	SetRevoked(revoked bool)
+	GetCoreClaim() CoreClaim
+	GetSignatureProof() pgtype.JSONB
+	GetCredentialStatusRaw() pgtype.JSONB
+	GetBJJSignatureProof2021() (*verifiable.BJJSignatureProof2021, error)
+	GetCircuitIncProof() (circuits.MTProof, error)
+	ConvertToClaimPublicInfo() *ClaimPublicInfo
+}
+
+type ClaimPublicInfo struct {
+	ID               uuid.UUID       `json:"-"`
+	Identifier       *string         `json:"identifier"`
+	Issuer           string          `json:"issuer"`
+	SchemaHash       string          `json:"schema_hash"`
+	Expiration       int64           `json:"expiration"`
+	RevNonce         RevNonceUint64  `json:"rev_nonce"`
+	Revoked          bool            `json:"revoked"`
+	CoreClaim        CoreClaim       `json:"core_claim"`
+	MTPProof         pgtype.JSONB    `json:"mtp_proof"`
+	SignatureProof   pgtype.JSONB    `json:"signature_proof"`
+	IdentityState    *string         `json:"-"`
+	CredentialStatus pgtype.JSONB    `json:"credential_status"`
+	HIndex           string          `json:"-"`
+	MtProof          bool            `json:"mt_poof"`
+	Status           *IdentityStatus `json:"status"`
+}
+
+func (c *ClaimPublicInfo) GetID() uuid.UUID {
+	return c.ID
+}
+
+func (c *ClaimPublicInfo) GetIdentifier() *string {
+	return c.Identifier
+}
+
+func (c *ClaimPublicInfo) GetIssuer() string {
+	return c.Issuer
+}
+
+func (c *ClaimPublicInfo) GetRevNonce() RevNonceUint64 {
+	return c.RevNonce
+}
+
+func (c *ClaimPublicInfo) GetRevoked() bool {
+	return c.Revoked
+}
+
+func (c *ClaimPublicInfo) SetRevoked(revoked bool) {
+	c.Revoked = revoked
+}
+
+func (c *ClaimPublicInfo) GetCoreClaim() CoreClaim {
+	return c.CoreClaim
+}
+
+func (c *ClaimPublicInfo) GetSignatureProof() pgtype.JSONB {
+	return c.SignatureProof
+}
+
+func (c *ClaimPublicInfo) GetCredentialStatusRaw() pgtype.JSONB {
+	return c.CredentialStatus
+}
+
+func (c *ClaimPublicInfo) ConvertToClaimPublicInfo() *ClaimPublicInfo {
+	return c
+}
+
+// GetBJJSignatureProof2021 TBD
+func (c *ClaimPublicInfo) GetBJJSignatureProof2021() (*verifiable.BJJSignatureProof2021, error) {
+	var sigProof verifiable.BJJSignatureProof2021
+	err := c.SignatureProof.AssignTo(&sigProof)
+	if err != nil {
+		return &sigProof, err
+	}
+	return &sigProof, nil
+}
+
+func (c *ClaimPublicInfo) GetCircuitIncProof() (circuits.MTProof, error) {
+	var proof verifiable.Iden3SparseMerkleTreeProof
+	err := c.MTPProof.AssignTo(&proof)
+	if err != nil {
+		return circuits.MTProof{}, err
+	}
+
+	return circuits.MTProof{
+		Proof: proof.MTP,
+		TreeState: circuits.TreeState{
+			State:          common.StrMTHex(proof.IssuerData.State.Value),
+			ClaimsRoot:     common.StrMTHex(proof.IssuerData.State.ClaimsTreeRoot),
+			RevocationRoot: common.StrMTHex(proof.IssuerData.State.RevocationTreeRoot),
+			RootOfRoots:    common.StrMTHex(proof.IssuerData.State.RootOfRoots),
+		},
+	}, nil
 }

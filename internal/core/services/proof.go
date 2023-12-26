@@ -246,7 +246,7 @@ func (p *Proof) getClaimDataForAtomicQueryCircuit(ctx context.Context, identifie
 			return nil, nil, err
 		}
 		var c *domain.Claim
-		c, err = p.claimSrv.GetByID(ctx, identifier, claimUUID)
+		c, err = p.claimSrv.GetByIDAuth(ctx, identifier, claimUUID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -290,7 +290,9 @@ func (p *Proof) findClaimForQuery(ctx context.Context, identifier *w3c.DID, quer
 		filter.Revoked = common.ToPointer(false)
 	}
 
-	claim, err := p.claimsRepository.GetAllByIssuerID(ctx, p.storage.Pgx, *identifier, filter)
+	filter.Auth = true
+
+	claim, err := p.claimsRepository.GetAllByIssuerIDAuth(ctx, p.storage.Pgx, *identifier, filter)
 	if errors.Is(err, repositories.ErrClaimDoesNotExist) {
 		return nil, fmt.Errorf("claim with credential type %v was not found", query)
 	}
@@ -298,17 +300,17 @@ func (p *Proof) findClaimForQuery(ctx context.Context, identifier *w3c.DID, quer
 	return claim, err
 }
 
-func (p *Proof) checkRevocationStatus(ctx context.Context, claim *domain.Claim) (*verifiable.RevocationStatus, error) {
+func (p *Proof) checkRevocationStatus(ctx context.Context, claim domain.ClaimPublicInfoI) (*verifiable.RevocationStatus, error) {
 	var (
 		err     error
 		claimRs *verifiable.RevocationStatus
 	)
 
 	var cs map[string]interface{}
-	if err = json.Unmarshal(claim.CredentialStatus.Bytes, &cs); err != nil {
+	if err = json.Unmarshal(claim.GetCredentialStatusRaw().Bytes, &cs); err != nil {
 		return nil, fmt.Errorf("failed unmasrshal credentialStatus: %s", err)
 	}
-	issuerDID, err := w3c.ParseDID(claim.Issuer)
+	issuerDID, err := w3c.ParseDID(claim.GetIssuer())
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +324,7 @@ func (p *Proof) checkRevocationStatus(ctx context.Context, claim *domain.Claim) 
 	if err != nil && errors.Is(err, protocol.ErrStateNotFound) {
 
 		bjp := new(verifiable.BJJSignatureProof2021)
-		if err := json.Unmarshal(claim.SignatureProof.Bytes, bjp); err != nil {
+		if err := json.Unmarshal(claim.GetSignatureProof().Bytes, bjp); err != nil {
 			return nil, fmt.Errorf("failed parse signature proof for get genesys state: %s", err)
 		}
 		state, errIn := merkletree.NewHashFromHex(*bjp.IssuerData.State.Value)
@@ -353,7 +355,7 @@ func (p *Proof) checkRevocationStatus(ctx context.Context, claim *domain.Claim) 
 	if claimRs.MTP.Existence {
 		// update revocation status
 		err = p.storage.Pgx.BeginFunc(ctx, func(tx pgx.Tx) error {
-			claim.Revoked = true
+			claim.SetRevoked(true)
 			_, err = p.claimsRepository.Save(ctx, p.storage.Pgx, claim)
 			if err != nil {
 				return fmt.Errorf("can't save claim %v", err)
@@ -562,7 +564,7 @@ func (p *Proof) prepareAuthV2Circuit(ctx context.Context, identifier *w3c.DID, c
 	return circuitInputs, nil
 }
 
-func (p *Proof) signChallange(ctx context.Context, authClaim *domain.Claim, challenge *big.Int) (*babyjub.Signature, error) {
+func (p *Proof) signChallange(ctx context.Context, authClaim *domain.ClaimPublicInfo, challenge *big.Int) (*babyjub.Signature, error) {
 	signingKeyID, err := p.identitySrv.GetKeyIDFromAuthClaim(ctx, authClaim)
 	if err != nil {
 		return nil, err
@@ -579,7 +581,7 @@ func (p *Proof) signChallange(ctx context.Context, authClaim *domain.Claim, chal
 	return kms.DecodeBJJSignature(sigBytes)
 }
 
-func (p *Proof) fillAuthClaimData(ctx context.Context, identifier *w3c.DID, authClaim *domain.Claim) (circuits.ClaimWithMTPProof, error) {
+func (p *Proof) fillAuthClaimData(ctx context.Context, identifier *w3c.DID, authClaim *domain.ClaimPublicInfo) (circuits.ClaimWithMTPProof, error) {
 	var authClaimData circuits.ClaimWithMTPProof
 
 	err := p.storage.Pgx.BeginFunc(
