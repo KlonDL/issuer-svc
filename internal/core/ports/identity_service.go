@@ -31,7 +31,7 @@ type IdentityService interface {
 	UpdateState(ctx context.Context, did w3c.DID) (*domain.IdentityState, error)
 	Exists(ctx context.Context, identifier w3c.DID) (bool, error)
 	GetLatestStateByID(ctx context.Context, identifier w3c.DID) (*domain.IdentityState, error)
-	GetKeyIDFromAuthClaim(ctx context.Context, authClaim *domain.Claim) (kms.KeyID, error)
+	GetKeyIDFromAuthClaim(ctx context.Context, authClaim *domain.ClaimPublicInfo) (kms.KeyID, error)
 	GetUnprocessedIssuersIDs(ctx context.Context) ([]*w3c.DID, error)
 	HasUnprocessedStatesByID(ctx context.Context, identifier w3c.DID) (bool, error)
 	HasUnprocessedAndFailedStatesByID(ctx context.Context, identifier w3c.DID) (bool, error)

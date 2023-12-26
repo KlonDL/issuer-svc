@@ -14,8 +14,6 @@ import (
 	"github.com/iden3/go-iden3-core/v2/w3c"
 	"github.com/iden3/go-schema-processor/v2/verifiable"
 	"github.com/iden3/iden3comm/v2"
-	"github.com/iden3/iden3comm/v2/packers"
-
 	"github.com/polygonid/sh-id-platform/internal/common"
 	"github.com/polygonid/sh-id-platform/internal/config"
 	"github.com/polygonid/sh-id-platform/internal/core/domain"
@@ -26,7 +24,6 @@ import (
 	"github.com/polygonid/sh-id-platform/internal/log"
 	"github.com/polygonid/sh-id-platform/internal/repositories"
 	link_state "github.com/polygonid/sh-id-platform/pkg/link"
-	"github.com/polygonid/sh-id-platform/pkg/schema"
 )
 
 // Server implements StrictServerInterface and holds the implementation of all API controllers
@@ -183,31 +180,32 @@ func (s *Server) AuthQRCode(ctx context.Context, _ AuthQRCodeRequestObject) (Aut
 
 // GetConnection returns a connection with its related credentials
 func (s *Server) GetConnection(ctx context.Context, request GetConnectionRequestObject) (GetConnectionResponseObject, error) {
-	conn, err := s.connectionsService.GetByIDAndIssuerID(ctx, request.Id, s.cfg.APIUI.IssuerDID)
-	if err != nil {
-		if errors.Is(err, services.ErrConnectionDoesNotExist) {
-			return GetConnection400JSONResponse{N400JSONResponse{"The given connection does not exist"}}, nil
-		}
-		log.Debug(ctx, "get connection internal server error", "err", err, "req", request)
-		return GetConnection500JSONResponse{N500JSONResponse{"There was an error retrieving the connection"}}, nil
-	}
-
-	filter := &ports.ClaimsFilter{
-		Subject: conn.UserDID.String(),
-	}
-	credentials, err := s.claimService.GetAll(ctx, s.cfg.APIUI.IssuerDID, filter)
-	if err != nil && !errors.Is(err, services.ErrClaimNotFound) {
-		log.Debug(ctx, "get connection internal server error retrieving credentials", "err", err, "req", request)
-		return GetConnection500JSONResponse{N500JSONResponse{"There was an error retrieving the connection"}}, nil
-	}
-
-	w3credentials, err := schema.FromClaimsModelToW3CCredential(credentials)
-	if err != nil {
-		log.Debug(ctx, "get connection internal server error converting credentials to w3c", "err", err, "req", request)
-		return GetConnection500JSONResponse{N500JSONResponse{"There was an error parsing the credential of the given connection"}}, nil
-	}
-
-	return GetConnection200JSONResponse(connectionResponse(conn, w3credentials, credentials)), nil
+	return GetConnection500JSONResponse{N500JSONResponse{"unimplemented"}}, nil
+	//conn, err := s.connectionsService.GetByIDAndIssuerID(ctx, request.Id, s.cfg.APIUI.IssuerDID)
+	//if err != nil {
+	//	if errors.Is(err, services.ErrConnectionDoesNotExist) {
+	//		return GetConnection400JSONResponse{N400JSONResponse{"The given connection does not exist"}}, nil
+	//	}
+	//	log.Debug(ctx, "get connection internal server error", "err", err, "req", request)
+	//	return GetConnection500JSONResponse{N500JSONResponse{"There was an error retrieving the connection"}}, nil
+	//}
+	//
+	//filter := &ports.ClaimsFilter{
+	//	Subject: conn.UserDID.String(),
+	//}
+	//credentials, err := s.claimService.GetAll(ctx, s.cfg.APIUI.IssuerDID, filter)
+	//if err != nil && !errors.Is(err, services.ErrClaimNotFound) {
+	//	log.Debug(ctx, "get connection internal server error retrieving credentials", "err", err, "req", request)
+	//	return GetConnection500JSONResponse{N500JSONResponse{"There was an error retrieving the connection"}}, nil
+	//}
+	//
+	//w3credentials, err := schema.FromClaimsModelToW3CCredential(credentials)
+	//if err != nil {
+	//	log.Debug(ctx, "get connection internal server error converting credentials to w3c", "err", err, "req", request)
+	//	return GetConnection500JSONResponse{N500JSONResponse{"There was an error parsing the credential of the given connection"}}, nil
+	//}
+	//
+	//return GetConnection200JSONResponse(connectionResponse(conn, w3credentials, credentials)), nil
 }
 
 // GetConnections returns the list of credentials of a determined issuer
@@ -266,43 +264,45 @@ func (s *Server) DeleteConnectionCredentials(ctx context.Context, request Delete
 
 // GetCredential returns a credential
 func (s *Server) GetCredential(ctx context.Context, request GetCredentialRequestObject) (GetCredentialResponseObject, error) {
-	credential, err := s.claimService.GetByID(ctx, &s.cfg.APIUI.IssuerDID, request.Id)
-	if err != nil {
-		if errors.Is(err, services.ErrClaimNotFound) {
-			return GetCredential400JSONResponse{N400JSONResponse{"The given credential id does not exist"}}, nil
-		}
-		return GetCredential500JSONResponse{N500JSONResponse{"There was an error trying to retrieve the credential information"}}, nil
-	}
-
-	w3c, err := schema.FromClaimModelToW3CCredential(*credential)
-	if err != nil {
-		return GetCredential500JSONResponse{N500JSONResponse{"Invalid claim format"}}, nil
-	}
-
-	return GetCredential200JSONResponse(credentialResponse(w3c, credential)), nil
+	return GetCredential500JSONResponse{N500JSONResponse{"unimplemented"}}, nil
+	//credential, err := s.claimService.GetByID(ctx, &s.cfg.APIUI.IssuerDID, request.Id)
+	//if err != nil {
+	//	if errors.Is(err, services.ErrClaimNotFound) {
+	//		return GetCredential400JSONResponse{N400JSONResponse{"The given credential id does not exist"}}, nil
+	//	}
+	//	return GetCredential500JSONResponse{N500JSONResponse{"There was an error trying to retrieve the credential information"}}, nil
+	//}
+	//
+	//w3c, err := schema.FromClaimModelToW3CCredential(*credential)
+	//if err != nil {
+	//	return GetCredential500JSONResponse{N500JSONResponse{"Invalid claim format"}}, nil
+	//}
+	//
+	//return GetCredential200JSONResponse(CredentialResponse(w3c, credential)), nil
 }
 
 // GetCredentials returns a collection of credentials that matches the request.
 func (s *Server) GetCredentials(ctx context.Context, request GetCredentialsRequestObject) (GetCredentialsResponseObject, error) {
-	filter, err := getCredentialsFilter(ctx, request.Params.Did, request.Params.Status, request.Params.Query)
-	if err != nil {
-		return GetCredentials400JSONResponse{N400JSONResponse{Message: err.Error()}}, nil
-	}
-	credentials, err := s.claimService.GetAll(ctx, s.cfg.APIUI.IssuerDID, filter)
-	if err != nil {
-		log.Error(ctx, "loading credentials", "err", err, "req", request)
-		return GetCredentials500JSONResponse{N500JSONResponse{Message: err.Error()}}, nil
-	}
-	response := make([]Credential, len(credentials))
-	for i, credential := range credentials {
-		w3c, err := schema.FromClaimModelToW3CCredential(*credential)
-		if err != nil {
-			log.Error(ctx, "creating credentials response", "err", err, "req", request)
-			return GetCredentials500JSONResponse{N500JSONResponse{"Invalid claim format"}}, nil
-		}
-		response[i] = credentialResponse(w3c, credential)
-	}
-	return GetCredentials200JSONResponse(response), nil
+	return GetCredentials500JSONResponse{N500JSONResponse{"unimplemented"}}, nil
+	//filter, err := getCredentialsFilter(ctx, request.Params.Did, request.Params.Status, request.Params.Query)
+	//if err != nil {
+	//	return GetCredentials400JSONResponse{N400JSONResponse{Message: err.Error()}}, nil
+	//}
+	//credentials, err := s.claimService.GetAll(ctx, s.cfg.APIUI.IssuerDID, filter)
+	//if err != nil {
+	//	log.Error(ctx, "loading credentials", "err", err, "req", request)
+	//	return GetCredentials500JSONResponse{N500JSONResponse{Message: err.Error()}}, nil
+	//}
+	//response := make([]Credential, len(credentials))
+	//for i, credential := range credentials {
+	//	w3c, err := schema.FromClaimModelToW3CCredential(*credential)
+	//	if err != nil {
+	//		log.Error(ctx, "creating credentials response", "err", err, "req", request)
+	//		return GetCredentials500JSONResponse{N500JSONResponse{"Invalid claim format"}}, nil
+	//	}
+	//	response[i] = CredentialResponse(w3c, credential)
+	//}
+	//return GetCredentials200JSONResponse(response), nil
 }
 
 // DeleteCredential deletes a credential
@@ -648,37 +648,38 @@ func (s *Server) GetLinkQRCode(ctx context.Context, request GetLinkQRCodeRequest
 
 // Agent is the controller to fetch credentials from mobile
 func (s *Server) Agent(ctx context.Context, request AgentRequestObject) (AgentResponseObject, error) {
-	if request.Body == nil || *request.Body == "" {
-		log.Debug(ctx, "agent empty request")
-		return Agent400JSONResponse{N400JSONResponse{"cannot proceed with an empty request"}}, nil
-	}
-	basicMessage, err := s.packageManager.UnpackWithType(packers.MediaTypeZKPMessage, []byte(*request.Body))
-	if err != nil {
-		log.Debug(ctx, "agent bad request", "err", err, "body", *request.Body)
-		return Agent400JSONResponse{N400JSONResponse{"cannot proceed with the given request"}}, nil
-	}
-
-	req, err := ports.NewAgentRequest(basicMessage)
-	if err != nil {
-		log.Error(ctx, "agent parsing request", "err", err)
-		return Agent400JSONResponse{N400JSONResponse{err.Error()}}, nil
-	}
-
-	agent, err := s.claimService.Agent(ctx, req)
-	if err != nil {
-		log.Error(ctx, "agent error", "err", err)
-		return Agent400JSONResponse{N400JSONResponse{err.Error()}}, nil
-	}
-
-	return Agent200JSONResponse{
-		Body:     agent.Body,
-		From:     agent.From,
-		Id:       agent.ID,
-		ThreadID: agent.ThreadID,
-		To:       agent.To,
-		Typ:      string(agent.Typ),
-		Type:     string(agent.Type),
-	}, nil
+	return Agent500JSONResponse{N500JSONResponse{Message: "not implemented"}}, nil
+	//if request.Body == nil || *request.Body == "" {
+	//	log.Debug(ctx, "agent empty request")
+	//	return Agent400JSONResponse{N400JSONResponse{"cannot proceed with an empty request"}}, nil
+	//}
+	//basicMessage, err := s.packageManager.UnpackWithType(packers.MediaTypeZKPMessage, []byte(*request.Body))
+	//if err != nil {
+	//	log.Debug(ctx, "agent bad request", "err", err, "body", *request.Body)
+	//	return Agent400JSONResponse{N400JSONResponse{"cannot proceed with the given request"}}, nil
+	//}
+	//
+	//req, err := ports.NewAgentRequest(basicMessage)
+	//if err != nil {
+	//	log.Error(ctx, "agent parsing request", "err", err)
+	//	return Agent400JSONResponse{N400JSONResponse{err.Error()}}, nil
+	//}
+	//
+	//agent, err := s.claimService.Agent(ctx, req)
+	//if err != nil {
+	//	log.Error(ctx, "agent error", "err", err)
+	//	return Agent400JSONResponse{N400JSONResponse{err.Error()}}, nil
+	//}
+	//
+	//return Agent200JSONResponse{
+	//	Body:     agent.Body,
+	//	From:     agent.From,
+	//	Id:       agent.ID,
+	//	ThreadID: agent.ThreadID,
+	//	To:       agent.To,
+	//	Typ:      string(agent.Typ),
+	//	Type:     string(agent.Type),
+	//}, nil
 }
 
 // GetQrFromStore is the controller to get qr bodies

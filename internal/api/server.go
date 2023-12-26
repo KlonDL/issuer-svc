@@ -17,7 +17,6 @@ import (
 	"github.com/iden3/iden3comm/v2"
 	"github.com/iden3/iden3comm/v2/packers"
 	"github.com/iden3/iden3comm/v2/protocol"
-
 	"github.com/polygonid/sh-id-platform/internal/common"
 	"github.com/polygonid/sh-id-platform/internal/config"
 	"github.com/polygonid/sh-id-platform/internal/core/domain"
@@ -273,7 +272,7 @@ func (s *Server) GetClaim(ctx context.Context, request GetClaimRequestObject) (G
 		return GetClaim500JSONResponse{N500JSONResponse{err.Error()}}, nil
 	}
 
-	w3c, err := schema.FromClaimModelToW3CCredential(*claim)
+	w3c, err := schema.FromClaimPublicInfoModelToW3CCredential(*claim)
 	if err != nil {
 		return GetClaim500JSONResponse{N500JSONResponse{"invalid claim format"}}, nil
 	}
@@ -309,7 +308,7 @@ func (s *Server) GetClaims(ctx context.Context, request GetClaimsRequestObject) 
 		return GetClaims500JSONResponse{N500JSONResponse{"there was an internal error trying to retrieve claims for the requested identifier"}}, nil
 	}
 
-	w3Claims, err := schema.FromClaimsModelToW3CCredential(claims)
+	w3Claims, err := schema.FromClaimsPublicInfoModelToW3CCredential(claims)
 	if err != nil {
 		return GetClaims500JSONResponse{N500JSONResponse{"there was an internal error parsing the claims"}}, nil
 	}
@@ -319,34 +318,35 @@ func (s *Server) GetClaims(ctx context.Context, request GetClaimsRequestObject) 
 
 // GetClaimQrCode returns a GetClaimQrCodeResponseObject that can be used with any QR generator to create a QR and
 // scan it with polygon wallet to accept the claim
-// TODO: this should be converted to a QR link
+// TODO: remove or modify
 func (s *Server) GetClaimQrCode(ctx context.Context, request GetClaimQrCodeRequestObject) (GetClaimQrCodeResponseObject, error) {
-	if request.Identifier == "" {
-		return GetClaimQrCode400JSONResponse{N400JSONResponse{"invalid did, cannot be empty"}}, nil
-	}
-
-	did, err := w3c.ParseDID(request.Identifier)
-	if err != nil {
-		return GetClaimQrCode400JSONResponse{N400JSONResponse{"invalid did"}}, nil
-	}
-
-	if request.Id == "" {
-		return GetClaimQrCode400JSONResponse{N400JSONResponse{"cannot proceed with an empty claim id"}}, nil
-	}
-
-	claimID, err := uuid.Parse(request.Id)
-	if err != nil {
-		return GetClaimQrCode400JSONResponse{N400JSONResponse{"invalid claim id"}}, nil
-	}
-
-	claim, err := s.claimService.GetByID(ctx, did, claimID)
-	if err != nil {
-		if errors.Is(err, services.ErrClaimNotFound) {
-			return GetClaimQrCode404JSONResponse{N404JSONResponse{err.Error()}}, nil
-		}
-		return GetClaimQrCode500JSONResponse{N500JSONResponse{err.Error()}}, nil
-	}
-	return toGetClaimQrCode200JSONResponse(claim, s.cfg.ServerUrl), nil
+	return GetClaimQrCode500JSONResponse{N500JSONResponse{"unimplemented"}}, nil
+	//if request.Identifier == "" {
+	//	return GetClaimQrCode400JSONResponse{N400JSONResponse{"invalid did, cannot be empty"}}, nil
+	//}
+	//
+	//did, err := w3c.ParseDID(request.Identifier)
+	//if err != nil {
+	//	return GetClaimQrCode400JSONResponse{N400JSONResponse{"invalid did"}}, nil
+	//}
+	//
+	//if request.Id == "" {
+	//	return GetClaimQrCode400JSONResponse{N400JSONResponse{"cannot proceed with an empty claim id"}}, nil
+	//}
+	//
+	//claimID, err := uuid.Parse(request.Id)
+	//if err != nil {
+	//	return GetClaimQrCode400JSONResponse{N400JSONResponse{"invalid claim id"}}, nil
+	//}
+	//
+	//claim, err := s.claimService.GetByID(ctx, did, claimID)
+	//if err != nil {
+	//	if errors.Is(err, services.ErrClaimNotFound) {
+	//		return GetClaimQrCode404JSONResponse{N404JSONResponse{err.Error()}}, nil
+	//	}
+	//	return GetClaimQrCode500JSONResponse{N500JSONResponse{err.Error()}}, nil
+	//}
+	//return toGetClaimQrCode200JSONResponse(claim, s.cfg.ServerUrl), nil
 }
 
 // GetIdentities is the controller to get identities
@@ -364,37 +364,39 @@ func (s *Server) GetIdentities(ctx context.Context, request GetIdentitiesRequest
 }
 
 // Agent is the controller to fetch credentials from mobile
+// todo: remove or modify
 func (s *Server) Agent(ctx context.Context, request AgentRequestObject) (AgentResponseObject, error) {
-	if request.Body == nil || *request.Body == "" {
-		log.Debug(ctx, "agent empty request")
-		return Agent400JSONResponse{N400JSONResponse{"cannot proceed with an empty request"}}, nil
-	}
-	basicMessage, err := s.packageManager.UnpackWithType(packers.MediaTypeZKPMessage, []byte(*request.Body))
-	if err != nil {
-		log.Debug(ctx, "agent bad request", "err", err, "body", *request.Body)
-		return Agent400JSONResponse{N400JSONResponse{"cannot proceed with the given request"}}, nil
-	}
-
-	req, err := ports.NewAgentRequest(basicMessage)
-	if err != nil {
-		log.Error(ctx, "agent parsing request", "err", err)
-		return Agent400JSONResponse{N400JSONResponse{err.Error()}}, nil
-	}
-
-	agent, err := s.claimService.Agent(ctx, req)
-	if err != nil {
-		log.Error(ctx, "agent error", "err", err)
-		return Agent400JSONResponse{N400JSONResponse{err.Error()}}, nil
-	}
-	return Agent200JSONResponse{
-		Body:     agent.Body,
-		From:     agent.From,
-		Id:       agent.ID,
-		ThreadID: agent.ThreadID,
-		To:       agent.To,
-		Typ:      string(agent.Typ),
-		Type:     string(agent.Type),
-	}, nil
+	return Agent500JSONResponse{N500JSONResponse{Message: "not implemented"}}, nil
+	//if request.Body == nil || *request.Body == "" {
+	//	log.Debug(ctx, "agent empty request")
+	//	return Agent400JSONResponse{N400JSONResponse{"cannot proceed with an empty request"}}, nil
+	//}
+	//basicMessage, err := s.packageManager.UnpackWithType(packers.MediaTypeZKPMessage, []byte(*request.Body))
+	//if err != nil {
+	//	log.Debug(ctx, "agent bad request", "err", err, "body", *request.Body)
+	//	return Agent400JSONResponse{N400JSONResponse{"cannot proceed with the given request"}}, nil
+	//}
+	//
+	//req, err := ports.NewAgentRequest(basicMessage)
+	//if err != nil {
+	//	log.Error(ctx, "agent parsing request", "err", err)
+	//	return Agent400JSONResponse{N400JSONResponse{err.Error()}}, nil
+	//}
+	//
+	//agent, err := s.claimService.Agent(ctx, req)
+	//if err != nil {
+	//	log.Error(ctx, "agent error", "err", err)
+	//	return Agent400JSONResponse{N400JSONResponse{err.Error()}}, nil
+	//}
+	//return Agent200JSONResponse{
+	//	Body:     agent.Body,
+	//	From:     agent.From,
+	//	Id:       agent.ID,
+	//	ThreadID: agent.ThreadID,
+	//	To:       agent.To,
+	//	Typ:      string(agent.Typ),
+	//	Type:     string(agent.Type),
+	//}, nil
 }
 
 // PublishIdentityState - publish identity state on chain
@@ -419,6 +421,29 @@ func (s *Server) PublishIdentityState(ctx context.Context, request PublishIdenti
 		State:              publishedState.State,
 		TxID:               publishedState.TxID,
 	}, nil
+}
+
+func (s *Server) CreateCredential(ctx context.Context, request CreateCredentialRequestObject) (CreateCredentialResponseObject, error) {
+	did, err := w3c.ParseDID(request.Identifier)
+	if err != nil {
+		return CreateCredential400JSONResponse{N400JSONResponse{Message: err.Error()}}, nil
+	}
+	if request.Body.SignatureProof == nil && request.Body.MtProof == nil {
+		return CreateCredential400JSONResponse{N400JSONResponse{Message: "you must to provide at least one proof type"}}, nil
+	}
+
+	req := ports.NewCreateClaimRequest(did, request.Body.CredentialSchema, request.Body.CredentialSubject, request.Body.Expiration, request.Body.Type, nil, nil, nil, request.Body.SignatureProof, request.Body.MtProof, nil, true, verifiable.CredentialStatusType(s.cfg.CredentialStatus.CredentialStatusType))
+	claim, err := s.claimService.Save(ctx, req)
+	if err != nil {
+		return CreateCredential500JSONResponse{N500JSONResponse{"There was an error trying to create cre"}}, nil
+	}
+
+	w3c, err := schema.FromClaimModelToW3CCredential(*claim)
+	if err != nil {
+		return CreateCredential500JSONResponse{N500JSONResponse{"Invalid claim format"}}, nil
+	}
+
+	return CreateCredential200JSONResponse(CredentialResponse(w3c, claim)), nil
 }
 
 // RetryPublishState - retry to publish the current state if it failed previously.
@@ -540,27 +565,17 @@ func toGetClaims200Response(claims []*verifiable.W3CCredential) GetClaims200JSON
 }
 
 func toGetClaim200Response(claim *verifiable.W3CCredential) GetClaimResponse {
-	var claimExpiration, claimIssuanceDate *TimeUTC
+	var claimExpiration *TimeUTC
 	if claim.Expiration != nil {
 		claimExpiration = common.ToPointer(TimeUTC(*claim.Expiration))
 	}
-	if claim.IssuanceDate != nil {
-		claimIssuanceDate = common.ToPointer(TimeUTC(*claim.IssuanceDate))
-	}
 	return GetClaimResponse{
-		Context: claim.Context,
-		CredentialSchema: CredentialSchema{
-			claim.CredentialSchema.ID,
-			claim.CredentialSchema.Type,
-		},
-		CredentialStatus:  claim.CredentialStatus,
-		CredentialSubject: claim.CredentialSubject,
-		Expiration:        claimExpiration,
-		Id:                claim.ID,
-		IssuanceDate:      claimIssuanceDate,
-		Issuer:            claim.Issuer,
-		Proof:             claim.Proof,
-		Type:              claim.Type,
+		CredentialStatus: claim.CredentialStatus,
+		Expiration:       claimExpiration,
+		Id:               claim.ID,
+		Issuer:           claim.Issuer,
+		Proof:            claim.Proof,
+		Type:             claim.Type,
 	}
 }
 

@@ -17,8 +17,6 @@ import (
 	"github.com/iden3/go-schema-processor/v2/merklize"
 	"github.com/iden3/go-schema-processor/v2/processor"
 	"github.com/iden3/go-schema-processor/v2/verifiable"
-	"github.com/iden3/iden3comm/v2/packers"
-	"github.com/iden3/iden3comm/v2/protocol"
 	shell "github.com/ipfs/go-ipfs-api"
 	"github.com/jackc/pgx/v4"
 
@@ -199,11 +197,15 @@ func (c *claim) CreateCredential(ctx context.Context, req *ports.CreateClaimRequ
 	claim.SchemaTypeDescription = &req.Type
 
 	if req.SignatureProof {
-		authClaim, err := c.GetAuthClaim(ctx, req.DID)
+		authClaimPublic, err := c.GetAuthClaim(ctx, req.DID)
 		if err != nil {
 			log.Error(ctx, "cannot retrieve the auth claim", "err", err)
 			return nil, err
 		}
+
+		authClaim := repositories.PublicInfoToDomainClaim(*authClaimPublic)
+
+		authClaim.Identifier = &issuerDIDString
 
 		proof, err := c.identitySrv.SignClaimEntry(ctx, authClaim, coreClaim)
 		if err != nil {
@@ -282,7 +284,7 @@ func (c *claim) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (c *claim) GetByID(ctx context.Context, issID *w3c.DID, id uuid.UUID) (*domain.Claim, error) {
+func (c *claim) GetByID(ctx context.Context, issID *w3c.DID, id uuid.UUID) (*domain.ClaimPublicInfo, error) {
 	claim, err := c.icRepo.GetByIdAndIssuer(ctx, c.storage.Pgx, issID, id)
 	if err != nil {
 		if errors.Is(err, repositories.ErrClaimDoesNotExist) {
@@ -294,71 +296,86 @@ func (c *claim) GetByID(ctx context.Context, issID *w3c.DID, id uuid.UUID) (*dom
 	return claim, nil
 }
 
-// GetCredentialQrCode creates a credential QR code for the given credential and returns the QR Link to be used
-func (c *claim) GetCredentialQrCode(ctx context.Context, issID *w3c.DID, id uuid.UUID, hostURL string) (string, string, error) {
-	getCredentialType := func(claim domain.Claim) string {
-		if claim.SchemaTypeDescription != nil {
-			return *claim.SchemaTypeDescription
+func (c *claim) GetByIDAuth(ctx context.Context, issID *w3c.DID, id uuid.UUID) (*domain.Claim, error) {
+	claim, err := c.icRepo.GetByIdAndIssuerAuth(ctx, c.storage.Pgx, issID, id)
+	if err != nil {
+		if errors.Is(err, repositories.ErrClaimDoesNotExist) {
+			return nil, ErrClaimNotFound
 		}
-		credentialType := claim.SchemaType
-		const schemaParts = 2
-		parse := strings.Split(credentialType, "#")
-		if len(parse) != schemaParts {
-			return credentialType
-		}
-		return parse[1]
-	}
-
-	claim, err := c.GetByID(ctx, issID, id)
-	if err != nil {
-		return "", "", err
-	}
-	credID := uuid.New()
-	qrCode := protocol.CredentialsOfferMessage{
-		Body: protocol.CredentialsOfferMessageBody{
-			Credentials: []protocol.CredentialOffer{
-				{
-					Description: getCredentialType(*claim),
-					ID:          claim.ID.String(),
-				},
-			},
-			URL: fmt.Sprintf("%s/v1/agent", strings.TrimSuffix(hostURL, "/")),
-		},
-		From:     claim.Issuer,
-		ID:       credID.String(),
-		ThreadID: credID.String(),
-		To:       claim.OtherIdentifier,
-		Typ:      packers.MediaTypePlainMessage,
-		Type:     protocol.CredentialOfferMessageType,
-	}
-
-	raw, err := json.Marshal(qrCode)
-	if err != nil {
-		return "", "", err
-	}
-	qrID, err := c.qrService.Store(ctx, raw, DefaultQRBodyTTL)
-	if err != nil {
-		return "", "", err
-	}
-	return c.qrService.ToURL(hostURL, qrID), getCredentialType(*claim), nil
-}
-
-func (c *claim) Agent(ctx context.Context, req *ports.AgentRequest) (*domain.Agent, error) {
-	exists, err := c.identitySrv.Exists(ctx, *req.IssuerDID)
-	if err != nil {
-		log.Error(ctx, "loading issuer identity", "err", err, "issuerDID", req.IssuerDID)
 		return nil, err
 	}
 
-	if !exists {
-		log.Warn(ctx, "issuer not found", "issuerDID", req.IssuerDID)
-		return nil, fmt.Errorf("cannot proceed with this identity, not found")
-	}
-
-	return c.getAgentCredential(ctx, req) // at this point the type is already validated
+	return claim, nil
 }
 
-func (c *claim) GetAuthClaim(ctx context.Context, did *w3c.DID) (*domain.Claim, error) {
+// todo: remove
+// GetCredentialQrCode creates a credential QR code for the given credential and returns the QR Link to be used
+func (c *claim) GetCredentialQrCode(ctx context.Context, issID *w3c.DID, id uuid.UUID, hostURL string) (string, string, error) {
+	return "", "", nil
+	//getCredentialType := func(claim domain.Claim) string {
+	//	if claim.SchemaTypeDescription != nil {
+	//		return *claim.SchemaTypeDescription
+	//	}
+	//	credentialType := claim.SchemaType
+	//	const schemaParts = 2
+	//	parse := strings.Split(credentialType, "#")
+	//	if len(parse) != schemaParts {
+	//		return credentialType
+	//	}
+	//	return parse[1]
+	//}
+	//
+	//claim, err := c.GetByID(ctx, issID, id)
+	//if err != nil {
+	//	return "", "", err
+	//}
+	//credID := uuid.New()
+	//qrCode := protocol.CredentialsOfferMessage{
+	//	Body: protocol.CredentialsOfferMessageBody{
+	//		Credentials: []protocol.CredentialOffer{
+	//			{
+	//				Description: getCredentialType(*claim),
+	//				ID:          claim.ID.String(),
+	//			},
+	//		},
+	//		URL: fmt.Sprintf("%s/v1/agent", strings.TrimSuffix(hostURL, "/")),
+	//	},
+	//	From:     claim.Issuer,
+	//	ID:       credID.String(),
+	//	ThreadID: credID.String(),
+	//	To:       claim.OtherIdentifier,
+	//	Typ:      packers.MediaTypePlainMessage,
+	//	Type:     protocol.CredentialOfferMessageType,
+	//}
+	//
+	//raw, err := json.Marshal(qrCode)
+	//if err != nil {
+	//	return "", "", err
+	//}
+	//qrID, err := c.qrService.Store(ctx, raw, DefaultQRBodyTTL)
+	//if err != nil {
+	//	return "", "", err
+	//}
+	//return c.qrService.ToURL(hostURL, qrID), getCredentialType(*claim), nil
+}
+
+func (c *claim) Agent(ctx context.Context, req *ports.AgentRequest) (*domain.Agent, error) {
+	return nil, nil
+	//exists, err := c.identitySrv.Exists(ctx, *req.IssuerDID)
+	//if err != nil {
+	//	log.Error(ctx, "loading issuer identity", "err", err, "issuerDID", req.IssuerDID)
+	//	return nil, err
+	//}
+	//
+	//if !exists {
+	//	log.Warn(ctx, "issuer not found", "issuerDID", req.IssuerDID)
+	//	return nil, fmt.Errorf("cannot proceed with this identity, not found")
+	//}
+	//
+	//return c.getAgentCredential(ctx, req) // at this point the type is already validated
+}
+
+func (c *claim) GetAuthClaim(ctx context.Context, did *w3c.DID) (*domain.ClaimPublicInfo, error) {
 	authHash, err := core.AuthSchemaHash.MarshalText()
 	if err != nil {
 		return nil, err
@@ -366,7 +383,7 @@ func (c *claim) GetAuthClaim(ctx context.Context, did *w3c.DID) (*domain.Claim, 
 	return c.icRepo.FindOneClaimBySchemaHash(ctx, c.storage.Pgx, did, string(authHash))
 }
 
-func (c *claim) GetAll(ctx context.Context, did w3c.DID, filter *ports.ClaimsFilter) ([]*domain.Claim, error) {
+func (c *claim) GetAll(ctx context.Context, did w3c.DID, filter *ports.ClaimsFilter) ([]*domain.ClaimPublicInfo, error) {
 	claims, err := c.icRepo.GetAllByIssuerID(ctx, c.storage.Pgx, did, filter)
 	if err != nil {
 		if errors.Is(err, repositories.ErrClaimDoesNotExist) {
@@ -422,7 +439,7 @@ func (c *claim) GetRevocationStatus(ctx context.Context, issuerDID w3c.DID, nonc
 	return revocationStatus, nil
 }
 
-func (c *claim) GetAuthClaimForPublishing(ctx context.Context, did *w3c.DID, state string) (*domain.Claim, error) {
+func (c *claim) GetAuthClaimForPublishing(ctx context.Context, did *w3c.DID, state string) (*domain.ClaimPublicInfo, error) {
 	authHash, err := core.AuthSchemaHash.MarshalText()
 	if err != nil {
 		return nil, err
@@ -529,7 +546,7 @@ func (c *claim) UpdateClaimsMTPAndState(ctx context.Context, currentState *domai
 	return nil
 }
 
-func (c *claim) GetByStateIDWithMTPProof(ctx context.Context, did *w3c.DID, state string) ([]*domain.Claim, error) {
+func (c *claim) GetByStateIDWithMTPProof(ctx context.Context, did *w3c.DID, state string) ([]*domain.ClaimPublicInfo, error) {
 	return c.icRepo.GetByStateIDWithMTPProof(ctx, c.storage.Pgx, did, state)
 }
 
@@ -553,8 +570,8 @@ func (c *claim) revoke(ctx context.Context, did *w3c.DID, nonce uint64, descript
 		return fmt.Errorf("error revoking the claim: %w", err)
 	}
 
-	var claim *domain.Claim
-	claim, err = c.icRepo.GetByRevocationNonce(ctx, pgx, did, domain.RevNonceUint64(nonce))
+	//var claim *domain.Claim
+	claim, err := c.icRepo.GetByRevocationNonce(ctx, pgx, did, domain.RevNonceUint64(nonce))
 
 	if err != nil {
 		if errors.Is(err, repositories.ErrClaimDoesNotExist) {
@@ -573,46 +590,47 @@ func (c *claim) revoke(ctx context.Context, did *w3c.DID, nonce uint64, descript
 }
 
 func (c *claim) getAgentCredential(ctx context.Context, basicMessage *ports.AgentRequest) (*domain.Agent, error) {
-	fetchRequestBody := &protocol.CredentialFetchRequestMessageBody{}
-	err := json.Unmarshal(basicMessage.Body, fetchRequestBody)
-	if err != nil {
-		log.Error(ctx, "unmarshalling agent body", "err", err)
-		return nil, fmt.Errorf("invalid credential fetch request body: %w", err)
-	}
-
-	claimID, err := uuid.Parse(fetchRequestBody.ID)
-	if err != nil {
-		log.Error(ctx, "wrong claimID in agent request body", "err", err)
-		return nil, fmt.Errorf("invalid claim ID")
-	}
-
-	claim, err := c.icRepo.GetByIdAndIssuer(ctx, c.storage.Pgx, basicMessage.IssuerDID, claimID)
-	if err != nil {
-		log.Error(ctx, "loading claim", "err", err)
-		return nil, fmt.Errorf("failed get claim by claimID: %w", err)
-	}
-
-	if claim.OtherIdentifier != basicMessage.UserDID.String() {
-		err := fmt.Errorf("claim doesn't relate to sender")
-		log.Error(ctx, "claim doesn't relate to sender", err, "claimID", claim.ID)
-		return nil, err
-	}
-
-	vc, err := schemaPkg.FromClaimModelToW3CCredential(*claim)
-	if err != nil {
-		log.Error(ctx, "creating W3 credential", "err", err)
-		return nil, fmt.Errorf("failed to convert claim to  w3cCredential: %w", err)
-	}
-
-	return &domain.Agent{
-		ID:       uuid.NewString(),
-		Typ:      packers.MediaTypePlainMessage,
-		Type:     protocol.CredentialIssuanceResponseMessageType,
-		ThreadID: basicMessage.ThreadID,
-		Body:     protocol.IssuanceMessageBody{Credential: *vc},
-		From:     basicMessage.IssuerDID.String(),
-		To:       basicMessage.UserDID.String(),
-	}, err
+	return nil, nil
+	//fetchRequestBody := &protocol.CredentialFetchRequestMessageBody{}
+	//err := json.Unmarshal(basicMessage.Body, fetchRequestBody)
+	//if err != nil {
+	//	log.Error(ctx, "unmarshalling agent body", "err", err)
+	//	return nil, fmt.Errorf("invalid credential fetch request body: %w", err)
+	//}
+	//
+	//claimID, err := uuid.Parse(fetchRequestBody.ID)
+	//if err != nil {
+	//	log.Error(ctx, "wrong claimID in agent request body", "err", err)
+	//	return nil, fmt.Errorf("invalid claim ID")
+	//}
+	//
+	//claim, err := c.icRepo.GetByIdAndIssuer(ctx, c.storage.Pgx, basicMessage.IssuerDID, claimID)
+	//if err != nil {
+	//	log.Error(ctx, "loading claim", "err", err)
+	//	return nil, fmt.Errorf("failed get claim by claimID: %w", err)
+	//}
+	//
+	//if claim.OtherIdentifier != basicMessage.UserDID.String() {
+	//	err := fmt.Errorf("claim doesn't relate to sender")
+	//	log.Error(ctx, "claim doesn't relate to sender", err, "claimID", claim.ID)
+	//	return nil, err
+	//}
+	//
+	//vc, err := schemaPkg.FromClaimModelToW3CCredential(*claim)
+	//if err != nil {
+	//	log.Error(ctx, "creating W3 credential", "err", err)
+	//	return nil, fmt.Errorf("failed to convert claim to  w3cCredential: %w", err)
+	//}
+	//
+	//return &domain.Agent{
+	//	ID:       uuid.NewString(),
+	//	Typ:      packers.MediaTypePlainMessage,
+	//	Type:     protocol.CredentialIssuanceResponseMessageType,
+	//	ThreadID: basicMessage.ThreadID,
+	//	Body:     protocol.IssuanceMessageBody{Credential: *vc},
+	//	From:     basicMessage.IssuerDID.String(),
+	//	To:       basicMessage.UserDID.String(),
+	//}, err
 }
 
 func (c *claim) createVC(ctx context.Context, claimReq *ports.CreateClaimRequest, vcID uuid.UUID, jsonLdContext string, nonce uint64) (verifiable.W3CCredential, error) {

@@ -265,7 +265,7 @@ func (i *identity) GetLatestStateByID(ctx context.Context, identifier w3c.DID) (
 
 // GetKeyIDFromAuthClaim finds BJJ KeyID of auth claim
 // in registered key providers
-func (i *identity) GetKeyIDFromAuthClaim(ctx context.Context, authClaim *domain.Claim) (kms.KeyID, error) {
+func (i *identity) GetKeyIDFromAuthClaim(ctx context.Context, authClaim *domain.ClaimPublicInfo) (kms.KeyID, error) {
 	var keyID kms.KeyID
 
 	if authClaim.Identifier == nil {
@@ -630,7 +630,7 @@ func (i *identity) createEthIdentity(ctx context.Context, tx db.Querier, hostURL
 		return nil, nil, err
 	}
 
-	_, err = i.claimsRepository.Save(ctx, tx, authClaimModel)
+	_, err = i.claimsRepository.SaveAuthClaim(ctx, tx, authClaimModel)
 	if err != nil {
 		return nil, nil, errors.Join(err, errors.New("can't save auth claim"))
 	}
@@ -691,7 +691,7 @@ func (i *identity) createIdentity(ctx context.Context, tx db.Querier, hostURL st
 		return nil, nil, err
 	}
 
-	_, err = i.claimsRepository.Save(ctx, tx, authClaimModel)
+	_, err = i.claimsRepository.SaveAuthClaim(ctx, tx, authClaimModel)
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't save auth claim: %w", err)
 	}

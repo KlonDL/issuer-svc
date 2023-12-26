@@ -6,18 +6,18 @@ CREATE TABLE claims (
     identifier text NOT NULL,
     issuer text NULL,
     schema_hash text NOT NULL,
-    schema_url text NOT NULL,
-    schema_type text NOT NULL,
-    other_identifier text NULL,
-    expiration int8 NULL,
-    updatable bool NULL DEFAULT false,
+--     schema_url text NOT NULL,
+--     schema_type text NOT NULL,
+--     other_identifier text NULL,
+    expiration int8 NULL, -- todo: remove?
+--     updatable bool NULL DEFAULT false,
     revoked bool NULL DEFAULT false,
-    "version" int8 NULL,
+--     "version" int8 NULL,
     rev_nonce numeric NULL,
-    metadata text NULL,
+--     metadata text NULL,
     core_claim text NULL,
     mtp_proof jsonb NULL,
-    "data" jsonb NULL,
+--     "data" jsonb NULL,
     signature_proof jsonb NULL,
     mtp jsonb NULL,
     merkle_root varchar(64) NULL,
@@ -28,7 +28,7 @@ CREATE TABLE claims (
     CONSTRAINT claims_pkey PRIMARY KEY (id, identifier)
 );
 
-CREATE INDEX claims_iden_other_iden ON claims USING btree (identifier, other_identifier);
+-- CREATE INDEX claims_iden_other_iden ON claims USING btree (identifier, other_identifier);
 
 
 CREATE TABLE connections (

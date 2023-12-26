@@ -320,7 +320,7 @@ func (p *publisher) publishProof(ctx context.Context, identifier *w3c.DID, newSt
 	return txID, nil
 }
 
-func (p *publisher) fillAuthClaimData(ctx context.Context, identifier *w3c.DID, authClaim *domain.Claim, newState domain.IdentityState) (
+func (p *publisher) fillAuthClaimData(ctx context.Context, identifier *w3c.DID, authClaim *domain.ClaimPublicInfo, newState domain.IdentityState) (
 	authClaimData *circuits.ClaimWithMTPProof, authClaimNewStateIncProof *merkletree.Proof, err error,
 ) {
 	err = p.storage.Pgx.BeginFunc(
@@ -473,10 +473,10 @@ func (p *publisher) updateIdentityStateTxStatus(ctx context.Context, state *doma
 }
 
 // groupByUserId - groups claims by user id
-func groupByUserId(claims []*domain.Claim) map[string][]string {
-	grouped := make(map[string][]string)
-	for _, c := range claims {
-		grouped[c.OtherIdentifier] = append(grouped[c.OtherIdentifier], c.ID.String())
+func groupByUserId(claims []*domain.ClaimPublicInfo) map[int][]string {
+	grouped := make(map[int][]string)
+	for i, c := range claims {
+		grouped[i] = append(grouped[i], c.ID.String())
 	}
 	return grouped
 }

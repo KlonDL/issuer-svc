@@ -69,7 +69,7 @@ func schemaCollectionResponse(schemas []domain.Schema) []Schema {
 	return res
 }
 
-func credentialResponse(w3c *verifiable.W3CCredential, credential *domain.Claim) Credential {
+func CredentialResponse(w3c *verifiable.W3CCredential, credential *domain.Claim) Credential {
 	var expiresAt *TimeUTC
 	expired := false
 	if w3c.Expiration != nil {
@@ -143,7 +143,7 @@ func connectionResponse(conn *domain.Connection, w3cs []*verifiable.W3CCredentia
 	credResp := make([]Credential, len(w3cs))
 	if w3cs != nil {
 		for i := range credentials {
-			credResp[i] = credentialResponse(w3cs[i], credentials[i])
+			credResp[i] = CredentialResponse(w3cs[i], credentials[i])
 		}
 	}
 

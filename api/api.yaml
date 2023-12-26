@@ -398,6 +398,38 @@ paths:
           $ref: '#/components/responses/404'
         '500':
           $ref: '#/components/responses/500'
+  /v1/{identifier}/credentials:
+    post:
+      summary: Create Credential
+      operationId: CreateCredential
+      description: Endpoint to create a Credential
+      tags:
+        - Credential
+      security:
+        - basicAuth: [ ]
+      parameters:
+        - $ref: '#/components/parameters/pathIdentifier'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCredentialRequest'
+      responses:
+        '200':
+          description: Claim created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Credential'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          $ref: '#/components/responses/422'
+        '500':
+          $ref: '#/components/responses/500'
 #agent
   /v1/agent:
     post:
@@ -666,7 +698,7 @@ components:
       type: object
       required:
         - id
-        - "@context"
+#        - "@context"
         - type
         - credentialSubject
         - credentialStatus
@@ -677,11 +709,31 @@ components:
         id:
           type: string
           x-omitempty: false
-        "@context":
-          type: array
-          x-omitempty: false
-          items:
-            type: string
+#        identifier:
+#          type: string
+#        issuer:
+#          type: string
+#          x-omitempty: false
+#        schemaHash:
+#          type: string
+#        expiresAt:
+#          $ref: '#/components/schemas/TimeUTC'
+#        expired:
+#          type: boolean
+#          example: true
+#        revoked:
+#          type: boolean
+#          example: false
+#        revNonce:
+#          type: integer
+#          format: uint64
+#          example: 2136005230
+#
+#        "@context":
+#          type: array
+#          x-omitempty: false
+#          items:
+#            type: string
         type:
           type: array
           x-omitempty: false
@@ -689,19 +741,19 @@ components:
             type: string
         expiration:
           $ref: '#/components/schemas/TimeUTC'
-        issuanceDate:
-          $ref: '#/components/schemas/TimeUTC'
-        credentialSubject:
-          type: object
-          x-omitempty: false
+#        issuanceDate:
+#          $ref: '#/components/schemas/TimeUTC'
+#        credentialSubject:
+#          type: object
+#          x-omitempty: false
         credentialStatus:
           type: null
         issuer:
           type: string
           x-omitempty: false
-        credentialSchema:
-          $ref: '#/components/schemas/CredentialSchema'
-          x-omitempty: false
+#        credentialSchema:
+#          $ref: '#/components/schemas/CredentialSchema'
+#          x-omitempty: false
         proof:
           type: null
 
@@ -818,6 +870,161 @@ components:
     ByteArray:
       type: string
       format: byte
+
+
+    CreateCredentialRequest:
+      type: object
+      required:
+        - credentialSchema
+        - type
+        - credentialSubject
+      properties:
+        credentialSchema:
+          type: string
+          x-omitempty: false
+          example: "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json/KYCAgeCredential-v3.json"
+        type:
+          type: string
+          x-omitempty: false
+          example: "KYCAgeCredential"
+        credentialSubject:
+          type: object
+          x-omitempty: false
+          example:
+            id: "{fill with did}"
+            birthday: 19960424
+            documentType: 2
+        expiration:
+          type: string
+          format: date-time
+          example: 2022-08-17T12:43:32.720Z
+        signatureProof:
+          type: boolean
+          example: true
+        mtProof:
+          type: boolean
+          example: true
+    Schema:
+      type: object
+      required:
+        - id
+        - hash
+        - bigInt
+        - url
+        - type
+        - createdAt
+        - version
+      properties:
+        id:
+          type: string
+          x-omitempty: false
+          example: c79c9c04-8c98-40f2-a7a0-5eeabf08d836
+        hash:
+          type: string
+          x-omitempty: false
+          example: 18f30714a35a5db88ca24728c0c53dfd
+        bigInt:
+          type: string
+          x-omitempty: false
+          example: "336615423900919464193075592850483704600"
+        url:
+          type: string
+          x-omitempty: false
+          example: https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json/KYCAgeCredential-v3.json
+        type:
+          type: string
+          x-omitempty: false
+          example: KYCCountryOfResidenceCredential
+        createdAt:
+          $ref: '#/components/schemas/TimeUTC'
+          x-omitempty: false
+        title:
+          type: string
+          x-omitempty: false
+          example: "KYC Age Credential"
+        description:
+          type: string
+          x-omitempty: false
+          example: "KYC Age Credential description"
+        version:
+          type: string
+          x-omitempty: false
+          example: "1.0.0"
+
+    Credential:
+      type: object
+      required:
+        - id
+        - proofTypes
+        - createdAt
+        - expired
+        - schemaHash
+        - schemaType
+        - schemaUrl
+        - revNonce
+        - credentialSubject
+        - revoked
+        - userID
+        - updatable
+        - version
+        - data
+        - metadata
+      properties:
+        id:
+          type: string
+          x-go-type: uuid.UUID
+          x-go-type-import:
+            name: uuid
+            path: github.com/google/uuid
+          example: 8edd8112-c415-11ed-b036-debe37e1cbd6
+        proofTypes:
+          type: array
+          items:
+            type: string
+          example: [ "BJJSignature2021" ]
+        createdAt:
+          $ref: '#/components/schemas/TimeUTC'
+        expiresAt:
+          $ref: '#/components/schemas/TimeUTC'
+        expired:
+          type: boolean
+          example: true
+        schemaHash:
+          type: string
+          example: "c9b2370371b7fa8b3dab2a5ba81b6838"
+        schemaType:
+          type: string
+          example: "KYCAgeCredential"
+        schemaUrl:
+          type: string
+          example: "https://raw.githubusercontent.com/iden3/claim-schema-vocab/main/schemas/json/KYCAgeCredential-v3.json"
+        revoked:
+          type: boolean
+          example: false
+        revNonce:
+          type: integer
+          format: uint64
+          example: 2136005230
+        credentialSubject:
+          type: object
+          x-omitempty: false
+          example:
+            birthday: 19960424
+            documentType: 2
+            id: "did:polygonid:polygon:mumbai:2qDDDKmo436EZGCBAvkqZjADYoNRJszkG7UymZeCHQ"
+        userID:
+          type: string
+          example: did:polygonid:polygon:mumbai:2qFpPHotk6oyaX1fcrpQFT4BMnmg8YszUwxYtaoGoe
+        schemaTypeDescription:
+          type: string
+          example: "KYC Age Credential"
+        updatable:
+          type: boolean
+        version:
+          type: integer
+          format: uint32
+        data:
+          $ref: '#/components/schemas/ByteArray'
 
     #Agent
     AgentResponse:
